@@ -284,7 +284,7 @@ impl Renderer {
     ///
     /// `draw_data`: the ImGui `DrawData` that each UI frame creates
     pub fn draw_commands<I, P>(&mut self, cmd_buf_builder : &mut AutoCommandBufferBuilder<P>, _queue : Arc<Queue>, target : I, draw_data : &imgui::DrawData) -> Result<(), RendererError>
-    where I: ImageAccess + Send + Sync + vulkano::SafeDeref + 'static {
+    where I: ImageAccess + Send + Sync + Sized + 'static, <I as Deref>::Target: vulkano::SafeDeref + Sized {
 
         let fb_width = draw_data.display_size[0] * draw_data.framebuffer_scale[0];
         let fb_height = draw_data.display_size[1] * draw_data.framebuffer_scale[1];
