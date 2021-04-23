@@ -1,5 +1,7 @@
 mod shader;
 
+use vulkano::image::view::ImageView;
+use vulkano::image::ImageViewAbstract;
 use vulkano::{buffer::{BufferAccess, BufferUsage, CpuBufferPool}, command_buffer::SubpassContents};
 use vulkano::command_buffer::{AutoCommandBufferBuilder, DynamicState};
 use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
@@ -190,7 +192,13 @@ impl From<vulkano::command_buffer::CopyBufferError> for RendererError {
 }
 
 
-pub type Texture = (Arc<dyn ImageAccess + Send + Sync>, Arc<Sampler>);
+// trait TextureTrait: ImageViewAbstract + ImageAccess + Send + Sync + vulkano::SafeDeref<Target = dyn ImageViewAbstract> {
+//
+// }
+
+// pub type Texture = (Arc<dyn ImageViewAbstract + Send + Sync + 'static>, Arc<Sampler>);
+pub type Texture = (Arc<ImageView< Arc<ImmutableImage<vulkano::format::Format>> >>, Arc<Sampler>);
+// pub type Texture = (Arc<ImmutableImage<vulkano::format::Format>>, Arc<Sampler>);
 
 pub struct Renderer {
     render_pass : Arc<dyn RenderPassAbstract + Send + Sync>,
@@ -283,8 +291,12 @@ impl Renderer {
     /// `target`: the target image to render to
     ///
     /// `draw_data`: the ImGui `DrawData` that each UI frame creates
-    pub fn draw_commands<I, P>(&mut self, cmd_buf_builder : &mut AutoCommandBufferBuilder<P>, _queue : Arc<Queue>, target : I, draw_data : &imgui::DrawData) -> Result<(), RendererError>
-    where I: ImageAccess + Send + Sync + Sized + 'static, <I as vulkano::image::view::ImageViewAbstract>::Target: vulkano::SafeDeref + Sized {
+    pub fn draw_commands<I: 'static, P>(&mut self, cmd_buf_builder : &mut AutoCommandBufferBuilder<P>, _queue : Arc<Queue>, target : I, draw_data : &imgui::DrawData) -> Result<(), RendererError>
+    where
+        // I: ImageAccess + Send + Sync + Sized + 'static + std::ops::Deref + vulkano::SafeDeref,
+        I: vulkano::image::view::ImageViewAbstract + ImageAccess + Send + Sync + vulkano::SafeDeref,
+        // ((), I): vulkano::framebuffer::AttachmentsList,
+    {
 
         let fb_width = draw_data.display_size[0] * draw_data.framebuffer_scale[0];
         let fb_height = draw_data.display_size[1] * draw_data.framebuffer_scale[1];
@@ -426,7 +438,8 @@ impl Renderer {
         device : Arc<Device>,
         queue : Arc<Queue>,
     ) -> Result<(), RendererError> {
-        self.font_texture = Self::upload_font_texture(ctx.fonts(), device, queue)?;
+        let (image, sampler) = Self::upload_font_texture(ctx.fonts(), device, queue)?;
+        self.font_texture = (image, sampler);
         Ok(())
     }
 
@@ -460,7 +473,7 @@ impl Renderer {
         let sampler = Sampler::simple_repeat_linear(device.clone());
 
         fonts.tex_id = TextureId::from(usize::MAX);
-        Ok((image, sampler))
+        Ok((ImageView::new(image).unwrap(), sampler))
     }
 
     fn lookup_texture(&self, texture_id: TextureId) -> Result<&Texture, RendererError> {
