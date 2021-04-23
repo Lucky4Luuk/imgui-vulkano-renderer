@@ -284,7 +284,7 @@ impl Renderer {
     ///
     /// `draw_data`: the ImGui `DrawData` that each UI frame creates
     pub fn draw_commands<I, P>(&mut self, cmd_buf_builder : &mut AutoCommandBufferBuilder<P>, _queue : Arc<Queue>, target : I, draw_data : &imgui::DrawData) -> Result<(), RendererError>
-    where I: ImageAccess + Send + Sync + 'static {
+    where I: ImageAccess + Send + Sync + vulkano::SafeDeref + 'static {
 
         let fb_width = draw_data.display_size[0] * draw_data.framebuffer_scale[0];
         let fb_height = draw_data.display_size[1] * draw_data.framebuffer_scale[1];
@@ -310,8 +310,8 @@ impl Renderer {
             ]
         };
 
-        let dims = match target.ImageDimensions() {
-            ImageDimensions::Dim2d {width, height} => {[width, height]},
+        let dims = match target.dimensions() {
+            ImageDimensions::Dim2d {width, height, ..} => {[width, height]},
             d => { return Err(RendererError::BadImageImageDimensions(d));}
         };
 
@@ -319,7 +319,7 @@ impl Renderer {
         dynamic_state.viewports = Some(vec![
             Viewport {
                 origin: [0.0, 0.0],
-                ImageDimensions: [dims[0] as f32, dims[1] as f32],
+                dimensions: [dims[0] as f32, dims[1] as f32],
                 depth_range: 0.0 .. 1.0,
             }
         ]);
@@ -375,7 +375,7 @@ impl Renderer {
                                         f32::max(0.0, clip_rect[0]).floor() as i32,
                                         f32::max(0.0, clip_rect[1]).floor() as i32
                                     ],
-                                    ImageDimensions: [
+                                    dimensions: [
                                         (clip_rect[2] - clip_rect[0]).abs().ceil() as u32,
                                         (clip_rect[3] - clip_rect[1]).abs().ceil() as u32
                                     ],
@@ -395,7 +395,8 @@ impl Renderer {
                                 vec![vertex_buffer.clone()],
                                 index_buffer.clone().into_buffer_slice().slice(idx_offset..(idx_offset+count)).unwrap(),
                                 set,
-                                pc)?;
+                                pc,
+                                0u32..1u32)?;
                         }
                     }
                     DrawCmd::ResetRenderState => (), // TODO
@@ -446,6 +447,7 @@ impl Renderer {
             ImageDimensions::Dim2d{
                 width : texture.width,
                 height : texture.height,
+                array_layers: 1,
             },
             vulkano::image::MipmapsCount::One,
             Format::R8G8B8A8Srgb,
