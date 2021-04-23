@@ -8,7 +8,7 @@ use vulkano::device::{Device, Queue};
 use vulkano::pipeline::{GraphicsPipeline, GraphicsPipelineCreationError, GraphicsPipelineAbstract};
 use vulkano::sync::GpuFuture;
 
-use vulkano::image::{ImmutableImage, Dimensions};
+use vulkano::image::{ImmutableImage, ImageDimensions};
 use vulkano::sampler::{Sampler};
 // use vulkano::sampler::{Sampler, SamplerAddressMode, Filter, MipmapMode};
 use vulkano::format::{Format, ClearValue};
@@ -17,7 +17,7 @@ use vulkano::pipeline::viewport::Scissor;
 use vulkano::framebuffer::Framebuffer;
 use vulkano::pipeline::viewport::Viewport;
 
-use vulkano::image::ImageViewAccess;
+use vulkano::image::ImageAccess;
 
 use std::sync::Arc;
 use std::fmt;
@@ -58,7 +58,7 @@ pub enum RendererError {
     FramebufferCreationError(vulkano::framebuffer::FramebufferCreationError),
     CopyBufferError(vulkano::command_buffer::CopyBufferError),
     BadTexture(TextureId),
-    BadImageDimensions(Dimensions),
+    BadImageImageDimensions(ImageDimensions),
 }
 
 impl fmt::Display for RendererError {
@@ -109,8 +109,8 @@ impl fmt::Display for RendererError {
             &Self::BadTexture(ref t) => {
                 write!(f, "The Texture ID could not be found: {:?}", t)
             },
-            &Self::BadImageDimensions(d) => {
-                write!(f, "Image Dimensions not supported (must be Dim2d): {:?}", d)
+            &Self::BadImageImageDimensions(d) => {
+                write!(f, "Image ImageDimensions not supported (must be Dim2d): {:?}", d)
             },
         }
     }
@@ -190,7 +190,7 @@ impl From<vulkano::command_buffer::CopyBufferError> for RendererError {
 }
 
 
-pub type Texture = (Arc<dyn ImageViewAccess + Send + Sync>, Arc<Sampler>);
+pub type Texture = (Arc<dyn ImageAccess + Send + Sync>, Arc<Sampler>);
 
 pub struct Renderer {
     render_pass : Arc<dyn RenderPassAbstract + Send + Sync>,
@@ -205,15 +205,15 @@ impl Renderer {
 
     /// Initialize the renderer object, including vertex buffers, ImGui font textures,
     /// and the Vulkan graphics pipeline.
-    /// 
+    ///
     /// ---
-    /// 
+    ///
     /// `ctx`: the ImGui `Context` object
-    /// 
+    ///
     /// `device`: the Vulkano `Device` object for the device you want to render the UI on.
-    /// 
+    ///
     /// `queue`: the Vulkano `Queue` object for the queue the font atlas texture will be created on.
-    /// 
+    ///
     /// `format`: the Vulkano `Format` that the render pass will use when storing the frame in the target image.
     pub fn init(ctx: &mut imgui::Context, device : Arc<Device>, queue : Arc<Queue>, format : Format) -> Result<Renderer, RendererError> {
 
@@ -271,20 +271,20 @@ impl Renderer {
     }
 
     /// Appends the draw commands for the UI frame to an `AutoCommandBufferBuilder`.
-    /// 
+    ///
     /// ---
-    /// 
+    ///
     /// `cmd_buf_builder`: An `AutoCommandBufferBuilder` from vulkano to add commands to
-    /// 
+    ///
     /// `device`: the Vulkano `Device` object for the device you want to render the UI on
-    /// 
+    ///
     /// `queue`: the Vulkano `Queue` object for buffer creation
-    /// 
+    ///
     /// `target`: the target image to render to
-    /// 
+    ///
     /// `draw_data`: the ImGui `DrawData` that each UI frame creates
-    pub fn draw_commands<I, P>(&mut self, cmd_buf_builder : &mut AutoCommandBufferBuilder<P>, _queue : Arc<Queue>, target : I, draw_data : &imgui::DrawData) -> Result<(), RendererError> 
-    where I: ImageViewAccess + Send + Sync + 'static {
+    pub fn draw_commands<I, P>(&mut self, cmd_buf_builder : &mut AutoCommandBufferBuilder<P>, _queue : Arc<Queue>, target : I, draw_data : &imgui::DrawData) -> Result<(), RendererError>
+    where I: ImageAccess + Send + Sync + 'static {
 
         let fb_width = draw_data.display_size[0] * draw_data.framebuffer_scale[0];
         let fb_height = draw_data.display_size[1] * draw_data.framebuffer_scale[1];
@@ -310,16 +310,16 @@ impl Renderer {
             ]
         };
 
-        let dims = match target.dimensions() {
-            Dimensions::Dim2d {width, height} => {[width, height]},
-            d => { return Err(RendererError::BadImageDimensions(d));}
+        let dims = match target.ImageDimensions() {
+            ImageDimensions::Dim2d {width, height} => {[width, height]},
+            d => { return Err(RendererError::BadImageImageDimensions(d));}
         };
 
         let mut dynamic_state = DynamicState::default();
         dynamic_state.viewports = Some(vec![
             Viewport {
                 origin: [0.0, 0.0],
-                dimensions: [dims[0] as f32, dims[1] as f32],
+                ImageDimensions: [dims[0] as f32, dims[1] as f32],
                 depth_range: 0.0 .. 1.0,
             }
         ]);
@@ -330,7 +330,7 @@ impl Renderer {
         let clip_off = draw_data.display_pos;
         let clip_scale = draw_data.framebuffer_scale;
 
-        
+
         let layout = self.pipeline.descriptor_set_layout(0).unwrap();
 
         let framebuffer = Arc::new(Framebuffer::start(self.render_pass.clone())
@@ -339,7 +339,7 @@ impl Renderer {
         cmd_buf_builder.begin_render_pass(framebuffer, SubpassContents::Inline, vec![ClearValue::None])?;
 
         for draw_list in draw_data.draw_lists() {
-            
+
             let vertex_buffer = Arc::new(self.vrt_buffer_pool.chunk(draw_list.vtx_buffer().iter().map(|&v| Vertex::from(v))).unwrap());
             let index_buffer  = Arc::new(self.idx_buffer_pool.chunk(draw_list.idx_buffer().iter().cloned()).unwrap());
 
@@ -375,7 +375,7 @@ impl Renderer {
                                         f32::max(0.0, clip_rect[0]).floor() as i32,
                                         f32::max(0.0, clip_rect[1]).floor() as i32
                                     ],
-                                    dimensions: [
+                                    ImageDimensions: [
                                         (clip_rect[2] - clip_rect[0]).abs().ceil() as u32,
                                         (clip_rect[3] - clip_rect[1]).abs().ceil() as u32
                                     ],
@@ -390,9 +390,9 @@ impl Renderer {
                             );
 
                             cmd_buf_builder.draw_indexed(
-                                self.pipeline.clone(), 
-                                &dynamic_state, 
-                                vec![vertex_buffer.clone()], 
+                                self.pipeline.clone(),
+                                &dynamic_state,
+                                vec![vertex_buffer.clone()],
                                 index_buffer.clone().into_buffer_slice().slice(idx_offset..(idx_offset+count)).unwrap(),
                                 set,
                                 pc)?;
@@ -409,15 +409,15 @@ impl Renderer {
 
         Ok(())
     }
-    
+
     /// Update the ImGui font atlas texture.
-    /// 
+    ///
     /// ---
-    /// 
+    ///
     /// `ctx`: the ImGui `Context` object
-    /// 
+    ///
     /// `device`: the Vulkano `Device` object for the device you want to render the UI on.
-    /// 
+    ///
     /// `queue`: the Vulkano `Queue` object for the queue the font atlas texture will be created on.
     pub fn reload_font_texture(
         &mut self,
@@ -443,7 +443,7 @@ impl Renderer {
 
         let (image, fut) = ImmutableImage::from_iter(
             texture.data.iter().cloned(),
-            Dimensions::Dim2d{
+            ImageDimensions::Dim2d{
                 width : texture.width,
                 height : texture.height,
             },
