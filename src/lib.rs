@@ -1,5 +1,6 @@
 mod shader;
 
+use vulkano::framebuffer::FramebufferAbstract;
 use vulkano::image::view::ImageView;
 use vulkano::image::ImageViewAbstract;
 use vulkano::{buffer::{BufferAccess, BufferUsage, CpuBufferPool}, command_buffer::SubpassContents};
@@ -294,7 +295,8 @@ impl Renderer {
     pub fn draw_commands<I: 'static, P>(&mut self, cmd_buf_builder : &mut AutoCommandBufferBuilder<P>, _queue : Arc<Queue>, target : I, draw_data : &imgui::DrawData) -> Result<(), RendererError>
     where
         // I: ImageAccess + Send + Sync + Sized + 'static + std::ops::Deref + vulkano::SafeDeref,
-        I: vulkano::image::view::ImageViewAbstract + ImageAccess + Send + Sync + vulkano::SafeDeref,
+        I: vulkano::image::view::ImageViewAbstract + ImageAccess + Send + Sync,
+        // I: FramebufferAbstract + Send + Sync,
         // ((), I): vulkano::framebuffer::AttachmentsList,
     {
 
