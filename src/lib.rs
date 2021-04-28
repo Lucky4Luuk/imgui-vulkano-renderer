@@ -294,8 +294,8 @@ impl Renderer {
     /// `draw_data`: the ImGui `DrawData` that each UI frame creates
     pub fn draw_commands<I: 'static, P>(&mut self, cmd_buf_builder : &mut AutoCommandBufferBuilder<P>, _queue : Arc<Queue>, target : Arc<I>, draw_data : &imgui::DrawData) -> Result<(), RendererError>
     where
-        // I: ImageViewAbstract + Send + Sync,
-        I: FramebufferAbstract + Send + Sync,
+        I: ImageViewAbstract + Send + Sync,
+        // I: FramebufferAbstract + Send + Sync,
     {
         let fb_width = draw_data.display_size[0] * draw_data.framebuffer_scale[0];
         let fb_height = draw_data.display_size[1] * draw_data.framebuffer_scale[1];
@@ -321,18 +321,19 @@ impl Renderer {
             ]
         };
 
-        // let dims = match &target.dimensions() {
-        //     ImageDimensions::Dim2d {width, height, ..} => {[width, height]},
-        //     d => { return Err(RendererError::BadImageImageDimensions(d));}
-        // };
+        let raw_dim = target.image().dimensions();
+        let dims = match &raw_dim {
+            ImageDimensions::Dim2d {width, height, ..} => {[width, height]},
+            d => { return Err(RendererError::BadImageImageDimensions(*d));}
+        };
 
-        let dims = {[target.width(), target.height()]};
+        // let dims = {[target.width(), target.height()]};
 
         let mut dynamic_state = DynamicState::default();
         dynamic_state.viewports = Some(vec![
             Viewport {
                 origin: [0.0, 0.0],
-                dimensions: [dims[0] as f32, dims[1] as f32],
+                dimensions: [*dims[0] as f32, *dims[1] as f32],
                 depth_range: 0.0 .. 1.0,
             }
         ]);
@@ -346,9 +347,10 @@ impl Renderer {
 
         let layout = self.pipeline.descriptor_set_layout(0).unwrap();
 
-        // let framebuffer = Arc::new(Framebuffer::start(self.render_pass.clone())
-        //     .add(target)?.build()?);
-        let framebuffer = target;
+        // let view = Arc::new(target.attached_image_view(0).unwrap());
+        let view = target;
+        let framebuffer = Arc::new(Framebuffer::start(self.render_pass.clone())
+            .add(view)?.build()?);
 
         cmd_buf_builder.begin_render_pass(framebuffer, SubpassContents::Inline, vec![ClearValue::None])?;
 
