@@ -292,10 +292,10 @@ impl Renderer {
     /// `target`: the target image to render to
     ///
     /// `draw_data`: the ImGui `DrawData` that each UI frame creates
-    pub fn draw_commands<I: 'static, P>(&mut self, cmd_buf_builder : &mut AutoCommandBufferBuilder<P>, _queue : Arc<Queue>, target : ImageView<I>, draw_data : &imgui::DrawData) -> Result<(), RendererError>
+    pub fn draw_commands<I: 'static, P>(&mut self, cmd_buf_builder : &mut AutoCommandBufferBuilder<P>, _queue : Arc<Queue>, target : I, draw_data : &imgui::DrawData) -> Result<(), RendererError>
     where
-        // I: ImageViewAbstract + ImageAccess + Send + Sync,
-        I: FramebufferAbstract + ImageAccess + Send + Sync,
+        I: ImageViewAbstract + ImageAccess + Send + Sync,
+        // I: FramebufferAbstract + ImageAccess + Send + Sync,
     {
         let fb_width = draw_data.display_size[0] * draw_data.framebuffer_scale[0];
         let fb_height = draw_data.display_size[1] * draw_data.framebuffer_scale[1];
