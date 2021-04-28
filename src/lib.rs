@@ -292,7 +292,7 @@ impl Renderer {
     /// `target`: the target image to render to
     ///
     /// `draw_data`: the ImGui `DrawData` that each UI frame creates
-    pub fn draw_commands<I: 'static, P>(&mut self, cmd_buf_builder : &mut AutoCommandBufferBuilder<P>, _queue : Arc<Queue>, target : &'static I, draw_data : &imgui::DrawData) -> Result<(), RendererError>
+    pub fn draw_commands<I: 'static, P>(&mut self, cmd_buf_builder : &mut AutoCommandBufferBuilder<P>, _queue : Arc<Queue>, target : Arc<I>, draw_data : &imgui::DrawData) -> Result<(), RendererError>
     where
         // I: ImageViewAbstract + Send + Sync,
         I: FramebufferAbstract + Send + Sync,
